@@ -1,8 +1,6 @@
 
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import HttpResponseRedirect
 from django.contrib.auth.models import User
-from django.urls import reverse
 from django.views import generic
 from django.contrib.auth import login, logout, authenticate
 import logging
@@ -22,37 +20,29 @@ def registration_request(request):
             context
         )
 
-    elif request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['psw']
-        first_name = request.POST['firstname']
-        last_name = request.POST['lastname']
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('psw')
+        first_name = request.POST.get('firstname', '')
+        last_name = request.POST.get('lastname', '')
 
-        user_exist = False
-
-        try:
-            User.objects.get(username=username)
-            user_exist = True
-        except User.DoesNotExist:
-            pass
-
-        if not user_exist:
-            user = User.objects.create_user(
-                username=username,
-                password=password,
-                first_name=first_name,
-                last_name=last_name
+        if User.objects.filter(username=username).exists():
+            context['message'] = 'User already exists.'
+            return render(
+                request,
+                'onlinecourse/user_registration_bootstrap.html',
+                context
             )
 
-            login(request, user)
-            return redirect('onlinecourse:index')
-
-        context['message'] = 'User already exists.'
-        return render(
-            request,
-            'onlinecourse/user_registration_bootstrap.html',
-            context
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            first_name=first_name,
+            last_name=last_name
         )
+
+        login(request, user)
+        return redirect('onlinecourse:index')
 
 
 def login_request(request):
@@ -143,19 +133,17 @@ def enroll(request, course_id):
 
 
 def extract_answers(request):
-    submitted_answers = []
+    selected_ids = []
 
     for key in request.POST:
-        if key.startswith('choice'):
-            value = request.POST[key]
+        if key.startswith('answer_') or key.startswith('choice'):
+            for value in request.POST.getlist(key):
+                try:
+                    selected_ids.append(int(value))
+                except (TypeError, ValueError):
+                    continue
 
-            try:
-                choice_id = int(value)
-                submitted_answers.append(choice_id)
-            except (TypeError, ValueError):
-                continue
-
-    return submitted_answers
+    return selected_ids
 
 
 def submit(request, course_id):
@@ -180,16 +168,17 @@ def submit(request, course_id):
         enrollment=enrollment
     )
 
-    for choice_id in extract_answers(request):
-        choice = get_object_or_404(
-            Choice,
-            pk=choice_id,
-            question__course=course
-        )
-        submission.choices.add(choice)
+    selected_ids = extract_answers(request)
+
+    valid_choices = Choice.objects.filter(
+        id__in=selected_ids,
+        question__course=course
+    )
+
+    submission.choices.set(valid_choices)
 
     return redirect(
-        'onlinecourse:exam_result',
+        'onlinecourse:show_exam_result',
         course_id=course.id,
         submission_id=submission.id
     )
@@ -199,10 +188,7 @@ def show_exam_result(request, course_id, submission_id):
     if not request.user.is_authenticated:
         return redirect('onlinecourse:login')
 
-    course = get_object_or_404(
-        Course,
-        pk=course_id
-    )
+    course = get_object_or_404(Course, pk=course_id)
 
     submission = get_object_or_404(
         Submission,
@@ -229,13 +215,14 @@ def show_exam_result(request, course_id, submission_id):
 
         question_results.append({
             'question': question,
+            'choices': question.choice_set.all(),
             'selected_ids': selected_ids,
             'score': score,
             'is_correct': is_correct,
         })
 
     percentage = (
-        (total_score / total_possible) * 100
+        round((total_score / total_possible) * 100, 2)
         if total_possible > 0 else 0
     )
 
