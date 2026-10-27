@@ -26,6 +26,14 @@ def registration_request(request):
         first_name = request.POST.get('firstname', '')
         last_name = request.POST.get('lastname', '')
 
+        if not username or not password:
+            context['message'] = 'Username and password are required.'
+            return render(
+                request,
+                'onlinecourse/user_registration_bootstrap.html',
+                context
+            )
+
         if User.objects.filter(username=username).exists():
             context['message'] = 'User already exists.'
             return render(
@@ -55,20 +63,22 @@ def login_request(request):
             context
         )
 
-    username = request.POST.get('username')
-    password = request.POST.get('psw')
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('psw')
 
-    user = authenticate(
-        request,
-        username=username,
-        password=password
-    )
+        user = authenticate(
+            request,
+            username=username,
+            password=password
+        )
 
-    if user is not None:
-        login(request, user)
-        return redirect('onlinecourse:index')
+        if user is not None:
+            login(request, user)
+            return redirect('onlinecourse:index')
 
-    context['message'] = 'Invalid username or password.'
+        context['message'] = 'Invalid username or password.'
+
     return render(
         request,
         'onlinecourse/user_login_bootstrap.html',
@@ -98,7 +108,9 @@ class CourseListView(generic.ListView):
 
 class CourseDetailView(generic.DetailView):
     model = Course
-    template_name = 'onlinecourse/course_detail_bootstrap.html'
+
+    # The assignment requests this exact plural filename.
+    template_name = 'onlinecourse/course_details_bootstrap.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -143,7 +155,8 @@ def extract_answers(request):
                 except (TypeError, ValueError):
                     continue
 
-    return selected_ids
+    # Remove duplicate choice IDs.
+    return list(set(selected_ids))
 
 
 def submit(request, course_id):
@@ -190,6 +203,7 @@ def show_exam_result(request, course_id, submission_id):
 
     course = get_object_or_404(Course, pk=course_id)
 
+    # A learner can only view their own submission for this course.
     submission = get_object_or_404(
         Submission,
         pk=submission_id,
