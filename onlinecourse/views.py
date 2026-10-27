@@ -1,4 +1,3 @@
-
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.models import User
 from django.views import generic
@@ -12,14 +11,12 @@ logger = logging.getLogger(__name__)
 
 def registration_request(request):
     context = {}
-
     if request.method == 'GET':
         return render(
             request,
             'onlinecourse/user_registration_bootstrap.html',
             context
         )
-
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('psw')
@@ -48,42 +45,35 @@ def registration_request(request):
             first_name=first_name,
             last_name=last_name
         )
-
         login(request, user)
         return redirect('onlinecourse:index')
 
 
 def login_request(request):
     context = {}
-
     if request.method == 'GET':
         return render(
             request,
             'onlinecourse/user_login_bootstrap.html',
             context
         )
-
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('psw')
-
         user = authenticate(
             request,
             username=username,
             password=password
         )
-
         if user is not None:
             login(request, user)
             return redirect('onlinecourse:index')
-
         context['message'] = 'Invalid username or password.'
-
-    return render(
-        request,
-        'onlinecourse/user_login_bootstrap.html',
-        context
-    )
+        return render(
+            request,
+            'onlinecourse/user_login_bootstrap.html',
+            context
+        )
 
 
 def logout_request(request):
@@ -108,22 +98,18 @@ class CourseListView(generic.ListView):
 
 class CourseDetailView(generic.DetailView):
     model = Course
-
     # The assignment requests this exact plural filename.
     template_name = 'onlinecourse/course_details_bootstrap.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         course = self.get_object()
-
         context['is_enrolled'] = False
-
         if self.request.user.is_authenticated:
             context['is_enrolled'] = check_if_enrolled(
                 self.request.user,
                 course
             )
-
         return context
 
 
@@ -132,12 +118,10 @@ def enroll(request, course_id):
         return redirect('onlinecourse:login')
 
     course = get_object_or_404(Course, pk=course_id)
-
     Enrollment.objects.get_or_create(
         user=request.user,
         course=course
     )
-
     return redirect(
         'onlinecourse:course_details',
         pk=course.id
@@ -146,7 +130,6 @@ def enroll(request, course_id):
 
 def extract_answers(request):
     selected_ids = []
-
     for key in request.POST:
         if key.startswith('answer_') or key.startswith('choice'):
             for value in request.POST.getlist(key):
@@ -154,7 +137,6 @@ def extract_answers(request):
                     selected_ids.append(int(value))
                 except (TypeError, ValueError):
                     continue
-
     # Remove duplicate choice IDs.
     return list(set(selected_ids))
 
@@ -170,7 +152,6 @@ def submit(request, course_id):
         return redirect('onlinecourse:login')
 
     course = get_object_or_404(Course, pk=course_id)
-
     enrollment = get_object_or_404(
         Enrollment,
         user=request.user,
@@ -182,12 +163,10 @@ def submit(request, course_id):
     )
 
     selected_ids = extract_answers(request)
-
     valid_choices = Choice.objects.filter(
         id__in=selected_ids,
         question__course=course
     )
-
     submission.choices.set(valid_choices)
 
     return redirect(
@@ -220,7 +199,6 @@ def show_exam_result(request, course_id, submission_id):
             submission.choices.filter(question=question)
             .values_list('id', flat=True)
         )
-
         is_correct = question.is_get_score(selected_ids)
         score = question.grade if is_correct else 0
 
@@ -244,6 +222,8 @@ def show_exam_result(request, course_id, submission_id):
         'course': course,
         'submission': submission,
         'question_results': question_results,
+        'grade': total_score,
+        'possible': total_possible,
         'total_score': total_score,
         'total_possible': total_possible,
         'percentage': percentage,

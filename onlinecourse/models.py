@@ -1,4 +1,3 @@
-
 import sys
 import uuid
 
@@ -26,19 +25,16 @@ class Learner(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )
-
     STUDENT = 'student'
     DEVELOPER = 'developer'
     DATA_SCIENTIST = 'data_scientist'
     DATABASE_ADMIN = 'dba'
-
     OCCUPATION_CHOICES = [
         (STUDENT, 'Student'),
         (DEVELOPER, 'Developer'),
         (DATA_SCIENTIST, 'Data Scientist'),
         (DATABASE_ADMIN, 'Database Admin'),
     ]
-
     occupation = models.CharField(
         max_length=20,
         choices=OCCUPATION_CHOICES,
@@ -85,13 +81,11 @@ class Enrollment(models.Model):
     AUDIT = 'audit'
     HONOR = 'honor'
     BETA = 'BETA'
-
     COURSE_MODES = [
         (AUDIT, 'Audit'),
         (HONOR, 'Honor'),
         (BETA, 'BETA'),
     ]
-
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE
     )
@@ -108,7 +102,7 @@ class Enrollment(models.Model):
 
 class Question(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    question_text = models.CharField(max_length=200)
+    question_text = models.TextField()
     grade = models.IntegerField(default=1)
 
     def __str__(self):
@@ -120,6 +114,9 @@ class Question(models.Model):
             .values_list("id", flat=True)
         )
         selected_ids = set(int(i) for i in selected_ids)
+        # Unanswered questions, or ones with no correct choice set, never score.
+        if not correct_ids or not selected_ids:
+            return False
         return correct_ids == selected_ids
 
 
@@ -137,4 +134,4 @@ class Submission(models.Model):
     choices = models.ManyToManyField(Choice)
 
     def __str__(self):
-        return f"Submission {self.id} for Enrollment {self.enrollment.id}"
+        return f"Submission {self.id} - Enrollment ID: {self.enrollment.id}"
